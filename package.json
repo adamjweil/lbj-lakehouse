@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:readonly": "tsc --noEmit && VITE_READONLY=true vite build",
+    "deploy:firebase": "npm run build:readonly && firebase deploy --only hosting",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "validate": "tsx scripts/validate.ts",

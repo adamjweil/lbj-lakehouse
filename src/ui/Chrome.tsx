@@ -10,6 +10,7 @@ import { formatFtIn, formatSqft } from '../model/units';
 import { stringifyDesign } from '../model/format';
 import { selectDirty, useStore, type Tool } from '../editor/store';
 import { onCursor } from '../editor/PlanOverlay';
+import { READONLY } from '../env';
 import { DISCIPLINES, disciplineOf, SHEETS, type SheetId } from '../views/sheets/sheetList';
 import { exportPdf } from '../export/pdf';
 
@@ -75,9 +76,13 @@ export function TopBar({ design }: { design: Design }) {
         ))}
       </div>
       <div className="actions">
-        <button onClick={undo} disabled={!canUndo || !!preview} title="Undo (⌘Z)">↶</button>
-        <button onClick={redo} disabled={!canRedo || !!preview} title="Redo (⇧⌘Z)">↷</button>
-        <button onClick={() => setHistoryOpen(true)} title="Saved versions">History</button>
+        {!READONLY && (
+          <>
+            <button onClick={undo} disabled={!canUndo || !!preview} title="Undo (⌘Z)">↶</button>
+            <button onClick={redo} disabled={!canRedo || !!preview} title="Redo (⇧⌘Z)">↷</button>
+            <button onClick={() => setHistoryOpen(true)} title="Saved versions">History</button>
+          </>
+        )}
         <button
           disabled={!!exporting}
           onClick={async () => {
@@ -93,11 +98,17 @@ export function TopBar({ design }: { design: Design }) {
         </button>
         <button onClick={() => setTakeoffOpen(true)} title="Download the framing takeoff">Takeoff</button>
         <button onClick={() => downloadJson(design)} title="Download house.json">JSON</button>
-        <button className={`primary ${dirty ? 'dirty' : ''}`} onClick={save} disabled={!dirty || saving || !!preview} title="Save to design/house.json (⌘S)">
-          {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
-        </button>
+        {READONLY ? (
+          <span className="badge" title="Published from design/house.json at build time. Nothing here can be edited or saved.">
+            Read-only
+          </span>
+        ) : (
+          <button className={`primary ${dirty ? 'dirty' : ''}`} onClick={save} disabled={!dirty || saving || !!preview} title="Save to design/house.json (⌘S)">
+            {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
+          </button>
+        )}
       </div>
-      {historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
+      {!READONLY && historyOpen && <HistoryDialog onClose={() => setHistoryOpen(false)} />}
       {takeoffOpen && <TakeoffDialog design={design} onClose={() => setTakeoffOpen(false)} />}
     </header>
   );

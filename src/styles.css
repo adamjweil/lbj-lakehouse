@@ -266,6 +266,18 @@ code {
   flex-shrink: 0;
 }
 
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .main {
   display: flex;
   min-height: 0;

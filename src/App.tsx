@@ -1,16 +1,23 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { useStore, type Tool, type ViewMode } from './editor/store';
 import { deleteFixture, deleteOpening, deleteRoom, deleteWall, moveWall, projectDelta } from './editor/ops';
+import { READONLY } from './env';
 import { isSheetId } from './views/sheets/sheetList';
 import { SheetViewer } from './ui/SheetViewer';
 import { Inspector } from './ui/Inspector';
 import { Banners, StatusBar, Toolbar, TopBar, ValidationPanel } from './ui/Chrome';
+// Bundled at build time so the read-only build needs no server; harmless to import otherwise.
+import bundledHouse from '../design/house.json';
 
 const Scene3D = lazy(() => import('./views/three/Scene3D').then((m) => ({ default: m.Scene3D })));
 
 const TOOL_KEYS: Record<string, Tool> = { v: 'select', w: 'wall', d: 'door', n: 'window', l: 'slider', o: 'room', f: 'fixture', m: 'measure' };
 
 async function loadDesign() {
+  if (READONLY) {
+    useStore.getState().loadFromDisk(JSON.stringify(bundledHouse));
+    return;
+  }
   const res = await fetch('/api/design');
   useStore.getState().loadFromDisk(await res.text());
 }
@@ -39,6 +46,12 @@ export function App() {
       const t = e.target as HTMLElement;
       if (t.closest('input, select, textarea, [contenteditable]')) return;
       const st = useStore.getState();
+      if (READONLY) {
+        // No server to save to and nothing editable: keep fit-to-sheet and deselect, drop the rest.
+        if (e.key === '0') window.dispatchEvent(new Event('sheet:fit'));
+        if (e.key === 'Escape') st.select(null);
+        return;
+      }
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -151,7 +164,7 @@ export function App() {
   }
 
   const shown = preview?.design ?? design;
-  const editable = !preview;
+  const editable = !preview && !READONLY;
   const showToolbar = editable && mode !== '3d' && sheet === 'A-101';
 
   return (
