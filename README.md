@@ -7,6 +7,9 @@ schedules, the framing takeoff, the 3D model, and the PDF export — is generate
 Edit the JSON (by hand, in the app, or by asking an AI assistant to), and every drawing,
 schedule, and cost estimate updates to match. Nothing is drawn or counted by hand twice.
 
+**Live read-only viewer:** [lbj-lakehouse.web.app](https://lbj-lakehouse.web.app) — the current
+design, browsable (sheets, schedules, 3D), no editing. See [Deploying](#deploying).
+
 > **Status:** preliminary design drawings, not construction documents. Every structural size
 > is an assumption for a licensed engineer to review and size. See [Disclaimer](#disclaimer).
 
@@ -87,7 +90,9 @@ re-drawing anything by hand.
 | `npm run textcheck [A-101 ...]` | Render the sheets headlessly and flag hard-to-read text (too small, overlapping, crossing a table rule, off the sheet). |
 | `npm run smoke` | End-to-end test: drag walls, undo, save, pick up a disk edit, add a window, export the PDF — against a scratch copy of the design. |
 | `npm run typecheck` | Run the TypeScript checks. |
-| `npm run build` | Type-check and build a static production bundle with Vite (see [Deploying](#deploying) — this is not the whole story for this app). |
+| `npm run build` | Type-check and build the production bundle with Vite. On its own this isn't deployable — see [Deploying](#deploying). |
+| `npm run build:readonly` | Build the read-only static bundle: `design/house.json` is baked in at build time, and every editing/saving feature is disabled. This is what's deployed to Firebase Hosting. |
+| `npm run deploy:firebase` | `build:readonly`, then `firebase deploy --only hosting`. |
 
 ## Editing the design (house.json)
 
@@ -153,34 +158,50 @@ responsibilities and the conventions the code follows.
 
 ## Deploying
 
-This is a **local design tool**, not a hosted web app, and that's a real distinction here, not
-just an unfinished feature: editing only works because a Node dev server
+This is fundamentally a **local design tool**: editing works because a Node dev server
 (`vite-plugin-design.ts`) reads and writes `design/house.json` and `design/history/` directly on
-disk, and watches the file for outside edits. A production static build (`npm run build`) drops
-that server plugin — Vite's dev-only `configureServer` hook doesn't run in a built app — so a
-plain static host would serve the page but every save (and the initial load, which fetches
+disk, and watches the file for outside edits. A plain production build (`npm run build`) drops
+that server plugin entirely — Vite's dev-only `configureServer` hook doesn't run in a built app —
+so a static host would serve the page but every save (and the initial load, which fetches
 `/api/design`) would fail.
 
-What that means in practice:
+There are two real ways to get this in front of people, depending on whether they need to edit
+it or just see it.
 
-- **To keep using the live editor**, run it where you're going to use it: `npm run dev` on your
-  own machine, or on a machine you control (a home server, a small VPS) with the repo checked
-  out there. If you want to reach it from elsewhere, put it behind a private tunnel (e.g.
-  Tailscale, or an SSH tunnel) rather than exposing the Vite dev server to the public internet —
-  it has no authentication and was never hardened for that.
-- **To share or publish the *output***, export it and host the export, not the app:
-  - `npm run smoke`'s PDF export path (or the "Export PDF" button in the app) produces the full
-    36"×24" sheet set as a PDF — the most natural thing to email or drop in a shared drive.
-  - `npm run snapshot` renders every sheet and 3D view to PNGs in `snapshots/` (gitignored by
-    default), which you can host as static images anywhere (a GitHub Pages branch, a bucket, a
-    wiki page).
-  - `npm run takeoff -- --csv <folder>` / `-- --json <file>` exports the framing takeoff as
-    plain data, if what you want to share is the numbers rather than the drawings.
-- **A read-only web viewer is possible but not built.** If you wanted `npm run build` to produce
-  something genuinely deployable (say, to Vercel, Netlify, or GitHub Pages), the app would need
-  a "read-only" mode that bakes a specific `house.json` into the bundle at build time instead of
-  fetching `/api/design`, and drops the save/history UI. That's a small, well-scoped change if
-  it's useful to you, but it isn't how the app works today.
+### Editable, for yourself
+
+Run it where you're going to use it: `npm run dev` on your own machine, or on a machine you
+control (a home server, a small VPS) with the repo checked out there. If you want to reach it
+from elsewhere, put it behind a private tunnel (e.g. Tailscale, or an SSH tunnel) rather than
+exposing the Vite dev server to the public internet — it has no authentication and was never
+hardened for that.
+
+### Read-only, published
+
+`npm run build:readonly` produces a static build with a fixed `design/house.json` baked in at
+build time (see [`src/env.ts`](src/env.ts) and the `VITE_READONLY` checks in
+[`src/App.tsx`](src/App.tsx)). It's a genuinely static site — no server, no filesystem access —
+that shows every sheet, the schedules, the framing takeoff, and both 3D views (finished and
+framing), with the Save/History buttons and every editing tool replaced by a "Read-only" badge.
+This is what's deployed to **[lbj-lakehouse.web.app](https://lbj-lakehouse.web.app)** via
+Firebase Hosting.
+
+To redeploy after changing the design or the code:
+
+```bash
+npm run deploy:firebase   # = npm run build:readonly && firebase deploy --only hosting
+```
+
+That uses the `lbj-lakehouse` Firebase project (see `.firebaserc`) and the Hosting config in
+`firebase.json` (serves `dist/`, with a catch-all rewrite to `index.html`). Firebase Hosting's
+free Spark plan covers this — it's static files only, no Cloud Functions or Firestore involved.
+
+If you'd rather share a specific one-off snapshot than the live design:
+- The "Export PDF" button (or `npm run smoke`'s export path) produces the full 36"×24" sheet set
+  as a PDF — the most natural thing to email or drop in a shared drive.
+- `npm run snapshot` renders every sheet and 3D view to PNGs in `snapshots/` (gitignored).
+- `npm run takeoff -- --csv <folder>` / `-- --json <file>` exports the framing takeoff as plain
+  data, if what you want to share is the numbers rather than the drawings.
 
 ## Disclaimer
 
